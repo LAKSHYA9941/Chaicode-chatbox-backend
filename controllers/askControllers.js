@@ -1,6 +1,9 @@
+import NodeCache from "node-cache";
 import { ask } from "../config/genai.js";
 import { Course } from "../models/Course.model.js";
 import { Message } from "../models/Message.model.js";
+
+const courseCache = new NodeCache({ stdTTL: 600 }); // Cache courses for 10 minutes
 
 export const askQuestion = async (req, res, next) => {
   try {
@@ -12,7 +15,15 @@ export const askQuestion = async (req, res, next) => {
       return res.status(400).json({ error: "Missing courseId" });
     }
 
-    const course = await Course.findOne({ courseId: selectedCourseId });
+    // Check cache for course
+    let course = courseCache.get(selectedCourseId);
+    if (!course) {
+      course = await Course.findOne({ courseId: selectedCourseId });
+      if (course) {
+        courseCache.set(selectedCourseId, course);
+      }
+    }
+
     if (!course || !course.isActive) {
       return res.status(404).json({ error: "Course not found or inactive" });
     }
@@ -38,17 +49,13 @@ export const askQuestion = async (req, res, next) => {
     const latencyMs = Date.now() - started;
 
     // fire-and-forget logging
-    try {
-      await Message.create({
-        userId: req.user?._id || null,
-        courseId: course.courseId,
-        query,
-        answer,
-        latencyMs,
-      });
-    } catch (e) {
-      console.warn("message log failed", e.message);
-    }
+    Message.create({
+      userId: req.user?._id || null,
+      courseId: course.courseId,
+      query,
+      answer,
+      latencyMs,
+    }).catch(e => console.warn("message log failed", e.message));
 
     res.json({
       ragAnswer: answer,

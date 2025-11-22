@@ -1,10 +1,12 @@
 import fs from "fs";
 import OpenAI from "openai";
+import NodeCache from "node-cache";
 import { ask } from "../config/genai.js";
 import { Course } from "../models/Course.model.js";
 import { VoiceSession } from "../models/VoiceSession.model.js";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const courseCache = new NodeCache({ stdTTL: 600 }); // Cache courses for 10 minutes
 const DEFAULT_VOICE = "alloy";
 const CHEERFUL_GREETINGS = [
   "Hanji! So good to hear from you.",
@@ -59,7 +61,15 @@ export const voiceChat = async (req, res) => {
       return res.status(400).json({ message: "Pick a course so I can give you the right context." });
     }
 
-    const course = await Course.findOne({ courseId });
+    // Check cache for course
+    let course = courseCache.get(courseId);
+    if (!course) {
+      course = await Course.findOne({ courseId });
+      if (course) {
+        courseCache.set(courseId, course);
+      }
+    }
+
     if (!course || !course.isActive) {
       return res.status(404).json({ message: "That course looks inactive. Try another one?" });
     }
@@ -106,7 +116,8 @@ export const voiceChat = async (req, res) => {
       audioBase64 = `data:audio/mpeg;base64,${buffer.toString("base64")}`;
     }
 
-    await VoiceSession.create({
+    // Non-blocking logging
+    VoiceSession.create({
       userId: user._id,
       courseId: course.courseId,
       transcript: transcriptText,
@@ -118,7 +129,7 @@ export const voiceChat = async (req, res) => {
         greeting: voiceGreeting,
         codeIntent,
       },
-    });
+    }).catch(err => console.warn("VoiceSession log failed", err.message));
 
     const payload = {
       transcript: transcriptText,
@@ -144,7 +155,8 @@ export const voiceChat = async (req, res) => {
     });
   } finally {
     if (audioFilePath) {
-      try { fs.unlinkSync(audioFilePath); } catch {}
+      // Async unlink to prevent blocking
+      fs.promises.unlink(audioFilePath).catch(() => { });
     }
   }
 };

@@ -1,7 +1,5 @@
-version: "3.9"
-
 services:
-  qdrant:
+  qdrant: 
     image: qdrant/qdrant:latest
     container_name: qdrant
     ports:
@@ -10,25 +8,5 @@ services:
     volumes:
       - qdrant_storage:/qdrant/storage
 
-  neo4j:
-    image: neo4j:5.23
-    container_name: neo4j
-    restart: unless-stopped
-    environment:
-      NEO4J_AUTH: "${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-changeme123}"
-      NEO4J_PLUGINS: '["apoc"]'
-    ports:
-      - "7474:7474"   # HTTP Browser
-      - "7687:7687"   # Bolt protocol
-    volumes:
-      - neo4j_data:/data
-      - neo4j_logs:/logs
-      - neo4j_plugins:/plugins
-      - neo4j_conf:/var/lib/neo4j/conf
-
 volumes:
   qdrant_storage:
-  neo4j_data:
-  neo4j_logs:
-  neo4j_plugins:
-  neo4j_conf:
