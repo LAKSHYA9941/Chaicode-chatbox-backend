@@ -6,21 +6,21 @@ import webvtt from "node-webvtt";
 import { QdrantClient } from "@qdrant/js-client-rest";
 // HF: removed GoogleGenerativeAIEmbeddings import
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
-import { InferenceClient } from "@huggingface/inference";   // <-- NEW
+import { OpenAIEmbeddings } from "@langchain/openai";
 import { v4 as uuid } from "uuid";
 
-const client = new QdrantClient({ url: "http://localhost:6333" });
+const client = new QdrantClient({ url: process.env.QDRANT_URL || "http://localhost:6333" });
 
+const EMBEDDING_MODEL = process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small";
+const EMBEDDING_DIMS = Number(process.env.OPENAI_EMBEDDING_DIMS || 1536);
 
-const hf = new InferenceClient(process.env.HF_TOKEN);        // <-- NEW
+const embeddings = new OpenAIEmbeddings({
+  apiKey: process.env.OPENAI_API_KEY,
+  model: EMBEDDING_MODEL,
+});
 
-async function embedWithHF(texts) {
-  const vectors = await hf.featureExtraction({
-    model: "sentence-transformers/all-MiniLM-L6-v2",
-    inputs: texts,
-  });
-
-  return vectors;
+async function embedWithOpenAI(texts) {
+  return embeddings.embedDocuments(texts);
 }
 // -----------------------------------------------------------------------------
 
@@ -41,7 +41,7 @@ function toSeconds(ts) {
 /* ---------- main ---------- */
 async function main() {
   await client.recreateCollection("courses", {
-    vectors: { size: 384, distance: "Cosine" }, // HF: gte-large outputs 1024-dim
+    vectors: { size: EMBEDDING_DIMS, distance: "Cosine" },
   });
 
   const files = fs
@@ -73,14 +73,14 @@ async function main() {
     const docs = await splitter.createDocuments([fullText]);
     console.log(`[${courseId}] ${docs.length} chunks`);
 
-    /* 3) embed all chunks in one HF call */
+    /* 3) embed all chunks in one OpenAI call */
     const texts = docs.map((d) => d.pageContent.trim()).filter((t) => t);
     if (!texts.length) {
       console.warn(`⚠️ [${courseId}] no valid chunks after split`);
       continue;
     }
 
-    const vectors = await embedWithHF(texts);
+    const vectors = await embedWithOpenAI(texts);
 
     const points = vectors.map((vec, i) => ({
       id: uuid(),
