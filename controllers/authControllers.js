@@ -21,11 +21,10 @@ const registerUser = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: "User already exists" });
   }
 
-  const hashedPassword = await bcrypt.hash(password, 10);
   const user = new User({
     username,
     email,
-    password: hashedPassword,
+    password,
     firstname,
     lastname
   });
@@ -65,7 +64,7 @@ const loginUser = asyncHandler(async (req, res) => {
   const userResponse = buildUserResponse(user);
 
   console.log('Login successful for user:', user._id);
-  res.status(200).json({ 
+  res.status(200).json({
     message: "Login successful",
     token,
     refreshToken,
@@ -88,7 +87,7 @@ const refreshToken = asyncHandler(async (req, res) => {
     // Generate new tokens
     const newToken = user.generateAuthToken();
     const newRefreshToken = user.generateRefreshToken();
-    
+
     // Update refresh token in database
     user.refreshToken = newRefreshToken;
     await user.save();
@@ -105,9 +104,9 @@ const refreshToken = asyncHandler(async (req, res) => {
 
 const logoutUser = asyncHandler(async (req, res) => {
   const { userId } = req.user;
-  
+
   // Clear refresh token
-  await User.findByIdAndUpdate(userId, { 
+  await User.findByIdAndUpdate(userId, {
     refreshToken: null,
     lastSeenAt: new Date()
   });
@@ -124,9 +123,9 @@ function buildUserResponse(user) {
   return userObj;
 }
 
-export { 
-  registerUser, 
-  loginUser, 
+export {
+  registerUser,
+  loginUser,
   logoutUser,
   refreshToken
 };

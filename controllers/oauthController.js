@@ -5,21 +5,39 @@ import { User } from "../models/User.models.js";
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 export const googleAuth = asyncHandler(async (req, res) => {
-  const { idToken } = req.body;
-  if (!idToken) {
-    return res.status(400).json({ message: "Missing Google ID token" });
+  const { idToken, accessToken } = req.body;
+  if (!idToken && !accessToken) {
+    return res.status(400).json({ message: "Missing Google token" });
   }
 
-  const ticket = await client.verifyIdToken({
-    idToken,
-    audience: process.env.GOOGLE_CLIENT_ID,
-  });
-  const payload = ticket.getPayload();
-  if (!payload?.email_verified) {
-    return res.status(401).json({ message: "Google email not verified" });
+  let email, name, picture, sub;
+
+  if (idToken) {
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    if (!payload?.email_verified) {
+      return res.status(401).json({ message: "Google email not verified" });
+    }
+    ({ sub, email, name, picture } = payload);
+  } else if (accessToken) {
+    const response = await fetch(`https://www.googleapis.com/oauth2/v3/userinfo`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!response.ok) {
+      return res.status(401).json({ message: "Invalid access token" });
+    }
+
+    const payload = await response.json();
+    if (!payload.email_verified) {
+      return res.status(401).json({ message: "Google email not verified" });
+    }
+    ({ sub, email, name, picture } = payload);
   }
 
-  const { sub, email, name, picture } = payload;
   const { firstName, lastName } = splitName(name);
   const derivedUsername = deriveUsername({ email, name, existingUsername: null });
 
