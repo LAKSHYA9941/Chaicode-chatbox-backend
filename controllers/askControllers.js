@@ -18,7 +18,7 @@ export const askQuestion = async (req, res, next) => {
     // Check cache for course
     let course = courseCache.get(selectedCourseId);
     if (!course) {
-      course = await Course.findOne({ courseId: selectedCourseId });
+      course = await Course.findOne({ courseId: selectedCourseId }).lean();
       if (course) {
         courseCache.set(selectedCourseId, course);
       }
