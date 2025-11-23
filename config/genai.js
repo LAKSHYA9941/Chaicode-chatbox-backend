@@ -13,7 +13,7 @@ const baseEmbeddings = new OpenAIEmbeddings({
   model: process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small", // 1536-dim
 });
 
-const client = new QdrantClient({ url: process.env.QDRANT_URL || "http://localhost:6333" });
+export const client = new QdrantClient({ url: process.env.QDRANT_URL || "http://localhost:6333" });
 
 // ---------- ready-to-use ask() for the front-end ----------
 
@@ -53,7 +53,7 @@ export async function ask(query, opts = {}) {
 6-Give concise but helpful answers with examples and code snippets where relevant.
 7-If asked about cost, respond with this link "https://hitesh.ai" or "https://www.chaicode.com".
 `
-;
+    ;
 
   const userPrompt = `Context (from course materials):\n${context}\n\nQuestion: ${query}`;
 

@@ -53,7 +53,7 @@ app.use(
 );
 app.use(express.json());
 // ensure uploads dir exists
-try { fs.mkdirSync("uploads", { recursive: true }); } catch {}
+try { fs.mkdirSync("uploads", { recursive: true }); } catch { }
 
 /* ---------- routes ---------- */
 app.use("/api/ask", askRoutes);
@@ -69,7 +69,16 @@ app.get("/", (req, res) => res.send("Hello World!"));
 /* ---------- error handler ---------- */
 app.use(errorHandler);
 
+import { client } from "./config/genai.js";
+
 /* ---------- start server ---------- */
-app.listen(PORT, () =>
-  console.log(`✅ Backend running at http://localhost:${PORT}`)
-);
+app.listen(PORT, async () => {
+  console.log(`✅ Backend running at http://localhost:${PORT}`);
+  try {
+    const collections = await client.getCollections();
+    console.log("✅ Connected to Qdrant:", process.env.QDRANT_URL);
+    console.log("   Collections:", collections.collections.map(c => c.name).join(", ") || "None");
+  } catch (err) {
+    console.error("❌ Failed to connect to Qdrant:", err.message);
+  }
+});
