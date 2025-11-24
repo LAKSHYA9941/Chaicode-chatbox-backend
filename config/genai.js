@@ -13,7 +13,12 @@ const baseEmbeddings = new OpenAIEmbeddings({
   model: process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small", // 1536-dim
 });
 
-export const client = new QdrantClient({ url: process.env.QDRANT_URL || "http://localhost:6333" });
+const url = process.env.QDRANT_URL || "http://localhost:6333";
+export const client = new QdrantClient({
+  url,
+  port: url.startsWith("https") ? 443 : 6333,
+  checkCompatibility: false,
+});
 
 // ---------- ready-to-use ask() for the front-end ----------
 

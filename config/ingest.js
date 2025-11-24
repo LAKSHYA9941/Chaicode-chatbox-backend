@@ -9,7 +9,7 @@ import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { v4 as uuid } from "uuid";
 
-const client = new QdrantClient({ url: process.env.QDRANT_URL || "http://localhost:6333" });
+import { client } from "./genai.js";
 
 const EMBEDDING_MODEL = process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small";
 const EMBEDDING_DIMS = Number(process.env.OPENAI_EMBEDDING_DIMS || 1536);

@@ -2,9 +2,7 @@ import asyncHandler from "../utils/asynchandler.js";
 import { Course } from "../models/Course.model.js";
 import { Ingestion } from "../models/Ingestion.model.js";
 import { ingestVttFiles } from "../services/ingestionService.js";
-import { QdrantClient } from "@qdrant/js-client-rest";
-
-const qdrant = new QdrantClient({ url: process.env.QDRANT_URL || "http://localhost:6333" });
+import { client as qdrant } from "../config/genai.js";
 
 export const createCourse = asyncHandler(async (req, res) => {
   const { courseId, name, iconUrl, description, qdrantCollection } = req.body;
@@ -51,7 +49,7 @@ export const deleteCourse = asyncHandler(async (req, res) => {
   if (!course) return res.status(404).json({ message: "Course not found" });
 
   if (String(dropVectors) === "true") {
-    try { await qdrant.deleteCollection(course.qdrantCollection); } catch {}
+    try { await qdrant.deleteCollection(course.qdrantCollection); } catch { }
   }
   await Course.deleteOne({ _id: course._id });
   res.json({ message: "Course deleted" });

@@ -8,11 +8,10 @@ import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { Document } from "@langchain/core/documents";
 
-const QDRANT_URL = process.env.QDRANT_URL || "http://localhost:6333";
+import { client } from "../config/genai.js";
+
 const EMBEDDING_MODEL = process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small"; // 1536
 const EMBEDDING_DIMS = Number(process.env.OPENAI_EMBEDDING_DIMS || 1536);
-
-const client = new QdrantClient({ url: QDRANT_URL });
 const embeddings = new OpenAIEmbeddings({ apiKey: process.env.OPENAI_API_KEY, model: EMBEDDING_MODEL });
 
 async function ensureCollection(collectionName, { forceRecreate = false } = {}) {
@@ -79,7 +78,7 @@ export async function ingestVttFiles({ course, files, forceRecreate = false, onP
   let totalDocs = 0;
   let processedFiles = 0;
   const totalFiles = files.length;
-  const reporter = typeof onProgress === "function" ? onProgress : async () => {};
+  const reporter = typeof onProgress === "function" ? onProgress : async () => { };
 
   for (const f of files) {
     const filePath = f.path; // multer path
