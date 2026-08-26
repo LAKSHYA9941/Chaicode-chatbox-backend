@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import NodeCache from "node-cache";
 import { ask } from "../config/genai.js";
 import { Course } from "../models/Course.model.js";
@@ -30,11 +31,53 @@ export const askQuestion = async (req, res, next) => {
 
     const started = Date.now();
     let answer;
+    const usePythonBrain = String(process.env.USE_PYTHON_BRAIN).toLowerCase() === "true" || process.env.USE_PYTHON_BRAIN === "1";
+
     try {
-      ({ answer } = await ask(query, {
-        courseName: course.name,
-        collectionName: course.qdrantCollection,
-      }));
+      if (usePythonBrain) {
+        // Python FastAPI Brain
+        const brainUrl = process.env.BRAIN_URL || "http://localhost:8000";
+        const secret = process.env.BRAIN_SHARED_SECRET || process.env.HMAC_SECRET || "sentinel-brain-secret";
+        const payload = JSON.stringify({
+          query,
+          collection_name: course.qdrantCollection,
+          course_id: course.courseId,
+          course_name: course.name,
+        });
+
+        const signature = crypto.createHmac("sha256", secret).update(payload).digest("hex");
+
+        const brainRes = await fetch(`${brainUrl}/rag/query`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Signature": signature,
+          },
+          body: payload,
+        });
+
+        if (!brainRes.ok) {
+          const errorData = await brainRes.json().catch(() => ({}));
+          if (brainRes.status === 503 || errorData?.detail?.includes?.("outdated")) {
+            return res.status(503).json({
+              error: "VECTOR_DIMENSION_MISMATCH",
+              message:
+                "Course vector store is outdated. Please re-run ingestion for this course to regenerate embeddings.",
+              details: errorData?.detail || null,
+            });
+          }
+          throw new Error(errorData?.detail || `Brain API error: ${brainRes.statusText}`);
+        }
+
+        const data = await brainRes.json();
+        answer = data.answer;
+      } else {
+        // Node.js genai.js fallback
+        ({ answer } = await ask(query, {
+          courseName: course.name,
+          collectionName: course.qdrantCollection,
+        }));
+      }
     } catch (err) {
       if (err?.code === "QDRANT_DIMENSION_MISMATCH") {
         return res.status(503).json({
@@ -46,6 +89,8 @@ export const askQuestion = async (req, res, next) => {
       }
       throw err;
     }
+
+
     const latencyMs = Date.now() - started;
 
     // fire-and-forget logging

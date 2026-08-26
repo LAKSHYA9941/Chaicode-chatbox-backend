@@ -1,3 +1,5 @@
+import crypto from "crypto";
+import fs from "fs";
 import asyncHandler from "../utils/asynchandler.js";
 import { Course } from "../models/Course.model.js";
 import { Ingestion } from "../models/Ingestion.model.js";
@@ -73,35 +75,88 @@ export const ingestCourse = asyncHandler(async (req, res) => {
     createdBy: req.user?._id || null,
   });
 
-  const progressUpdates = [];
+  const usePythonBrain = String(process.env.USE_PYTHON_BRAIN).toLowerCase() === "true" || process.env.USE_PYTHON_BRAIN === "1";
 
   try {
-    const result = await ingestVttFiles({
-      course,
-      files: req.files,
-      forceRecreate,
-      onProgress: async (payload) => {
-        progressUpdates.push(payload);
-        await Ingestion.updateOne({ _id: ingestion._id }, {
-          $set: {
-            progress: {
-              processedFiles: payload.fileIndex ?? 0,
-              totalFiles: payload.totalFiles ?? req.files.length,
-              lastFile: payload.fileName || null,
-              lastDocs: payload.docs ?? 0,
-              totalDocs: payload.totalDocs ?? 0,
-              updatedAt: payload.timestamp ? new Date(payload.timestamp) : new Date(),
+    let result;
+    const progressUpdates = [];
+
+    if (usePythonBrain) {
+      // Python FastAPI Brain Ingestion
+      const filePayload = req.files.map((f) => {
+        let content = "";
+        try {
+          if (f.path && fs.existsSync(f.path)) {
+            content = fs.readFileSync(f.path, "utf8");
+          }
+        } catch (err) { }
+        return {
+          path: f.path,
+          originalname: f.originalname || f.filename,
+          content: content || undefined,
+        };
+      });
+
+      const brainUrl = process.env.BRAIN_URL || "http://localhost:8000";
+      const secret = process.env.BRAIN_SHARED_SECRET || process.env.HMAC_SECRET || "sentinel-brain-secret";
+
+      const payload = JSON.stringify({
+        course_id: course.courseId,
+        collection_name: course.qdrantCollection,
+        files: filePayload,
+        file_paths: req.files.map((f) => f.path),
+        force_recreate: forceRecreate,
+      });
+
+      const signature = crypto.createHmac("sha256", secret).update(payload).digest("hex");
+
+      const brainRes = await fetch(`${brainUrl}/rag/ingest`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Signature": signature,
+        },
+        body: payload,
+      });
+
+      if (!brainRes.ok) {
+        const errorData = await brainRes.json().catch(() => ({}));
+        throw new Error(errorData?.detail || `Brain API error: ${brainRes.statusText}`);
+      }
+
+      result = await brainRes.json();
+    } else {
+      // Node.js ingestionService.js fallback
+      result = await ingestVttFiles({
+        course,
+        files: req.files,
+        forceRecreate,
+        onProgress: async (payload) => {
+          progressUpdates.push(payload);
+          await Ingestion.updateOne({ _id: ingestion._id }, {
+            $set: {
+              progress: {
+                processedFiles: payload.fileIndex ?? 0,
+                totalFiles: payload.totalFiles ?? req.files.length,
+                lastFile: payload.fileName || null,
+                lastDocs: payload.docs ?? 0,
+                totalDocs: payload.totalDocs ?? 0,
+                updatedAt: payload.timestamp ? new Date(payload.timestamp) : new Date(),
+              },
             },
-          },
-        });
-      },
-    });
+          });
+        },
+      });
+    }
+
+    const upsertedCount = result.upserted ?? 0;
+
     await Course.updateOne({ _id: course._id }, {
       $set: { "stats.lastIngestAt": new Date() },
-      $inc: { "stats.vectors": result.upserted },
+      $inc: { "stats.vectors": upsertedCount },
     });
     await Ingestion.updateOne({ _id: ingestion._id }, {
-      $set: { status: "completed", finishedAt: new Date(), upserted: result.upserted, totalChunks: result.upserted },
+      $set: { status: "completed", finishedAt: new Date(), upserted: upsertedCount, totalChunks: upsertedCount },
     });
     res.json({
       message: "Ingestion completed",
@@ -116,6 +171,8 @@ export const ingestCourse = asyncHandler(async (req, res) => {
     res.status(500).json({ message: "Ingestion failed", error: e.message });
   }
 });
+
+
 
 export const getInsights = asyncHandler(async (_req, res) => {
   const { User } = await import("../models/User.models.js");
