@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 
 from app.schemas import IngestRequest, IngestResponse, RagQueryRequest, RagQueryResponse
 from app.rag import query_rag
-from app.ingestion import ingest_vtt_files
+from app.ingestion import ingest_md_files, ingest_vtt_files
 
 # Load environment variables
 load_dotenv(find_dotenv(usecwd=True))
@@ -132,7 +132,7 @@ def rag_query_endpoint(request: RagQueryRequest):
 def rag_ingest_endpoint(request: IngestRequest):
     try:
         files_to_process = request.files if request.files else request.file_paths
-        result = ingest_vtt_files(
+        result = ingest_md_files(
             course={"courseId": request.course_id, "qdrantCollection": request.collection_name},
             files=files_to_process,
             force_recreate=request.force_recreate,
