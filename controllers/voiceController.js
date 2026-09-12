@@ -5,7 +5,7 @@ import { ask } from "../config/genai.js";
 import { Course } from "../models/Course.model.js";
 import { VoiceSession } from "../models/VoiceSession.model.js";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 const courseCache = new NodeCache({ stdTTL: 600 }); // Cache courses for 10 minutes
 const DEFAULT_VOICE = "alloy";
 const CHEERFUL_GREETINGS = [

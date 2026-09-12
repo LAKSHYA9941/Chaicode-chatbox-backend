@@ -5,13 +5,15 @@ import { OpenAIEmbeddings } from "@langchain/openai";
 import OpenAI from "openai";
 
 // ---------- shared instances ----------
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 
 // OpenAI embeddings: must match ingestion dimensions
-const baseEmbeddings = new OpenAIEmbeddings({
-  apiKey: process.env.OPENAI_API_KEY,
-  model: process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small", // 1536-dim
-});
+const baseEmbeddings = process.env.OPENAI_API_KEY
+  ? new OpenAIEmbeddings({
+      apiKey: process.env.OPENAI_API_KEY,
+      model: process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small", // 1536-dim
+    })
+  : null;
 
 const url = process.env.QDRANT_URL || "http://localhost:6333";
 export const client = new QdrantClient({

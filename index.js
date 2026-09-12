@@ -24,13 +24,18 @@ connectDB();
 // seed defaults
 (async () => {
   try {
-    const count = await Course.countDocuments();
-    if (count === 0) {
-      await Course.create([
-        { courseId: "nodejs", name: "Node.js", qdrantCollection: "courses", description: "Server-side JavaScript runtime", isActive: true },
-        { courseId: "python", name: "Python", qdrantCollection: "courses", description: "Versatile programming language", isActive: true },
-      ]);
-      console.log(" Seeded default courses: nodejs, python");
+    const defaultCourses = [
+      { courseId: "nodejs", name: "Node.js", qdrantCollection: "courses", description: "Server-side JavaScript runtime", isActive: true },
+      { courseId: "python", name: "Python", qdrantCollection: "courses", description: "Versatile programming language", isActive: true },
+      { courseId: "ncert_science_7", name: "Class 7 Science", qdrantCollection: "science_grade_7", description: "NCERT Grade 7 Science Textbook", isActive: true },
+    ];
+
+    for (const c of defaultCourses) {
+      const exists = await Course.findOne({ courseId: c.courseId });
+      if (!exists) {
+        await Course.create(c);
+        console.log(`✅ Seeded course: ${c.courseId} (${c.name})`);
+      }
     }
   } catch (e) {
     console.warn("Seed error:", e.message);

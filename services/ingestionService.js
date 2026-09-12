@@ -12,7 +12,9 @@ import { client } from "../config/genai.js";
 
 const EMBEDDING_MODEL = process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small"; // 1536
 const EMBEDDING_DIMS = Number(process.env.OPENAI_EMBEDDING_DIMS || 1536);
-const embeddings = new OpenAIEmbeddings({ apiKey: process.env.OPENAI_API_KEY, model: EMBEDDING_MODEL });
+const embeddings = process.env.OPENAI_API_KEY
+  ? new OpenAIEmbeddings({ apiKey: process.env.OPENAI_API_KEY, model: EMBEDDING_MODEL })
+  : null;
 
 async function ensureCollection(collectionName, { forceRecreate = false } = {}) {
   let needsCreate = false;
