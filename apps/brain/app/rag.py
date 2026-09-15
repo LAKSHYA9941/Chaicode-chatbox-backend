@@ -5,6 +5,7 @@ from dotenv import find_dotenv, load_dotenv
 from groq import Groq
 from nomic import embed
 from qdrant_client import QdrantClient
+from qdrant_client.http import models
 
 from app.schemas import RagQueryRequest, RagQueryResponse, Source
 
@@ -89,7 +90,13 @@ def get_system_prompt(course_name: str = "") -> str:
 """
 
 
-def similarity_search(collection_name: str, query: str, limit: int = 4) -> List[Dict[str, Any]]:
+def similarity_search(
+    collection_name: str, 
+    query: str, 
+    limit: int = 4,
+    class_filter: Optional[str] = None,
+    subject_filter: Optional[str] = None,
+) -> List[Dict[str, Any]]:
     """Retrieve relevant chunks from Qdrant vector store."""
     if not collection_name:
         raise ValueError("collectionName is required for retrieval")
@@ -97,10 +104,21 @@ def similarity_search(collection_name: str, query: str, limit: int = 4) -> List[
     client = get_qdrant_client()
     query_vector = get_embedding(query)
 
+    query_filter = None
+    must_conditions = []
+    if class_filter:
+        must_conditions.append(models.FieldCondition(key="class", match=models.MatchValue(value=class_filter)))
+    if subject_filter:
+        must_conditions.append(models.FieldCondition(key="subject", match=models.MatchValue(value=subject_filter)))
+    
+    if must_conditions:
+        query_filter = models.Filter(must=must_conditions)
+
     try:
         results = client.query_points(
             collection_name=collection_name,
             query=query_vector,
+            query_filter=query_filter,
             limit=limit,
             with_payload=True,
         )
@@ -141,6 +159,8 @@ def ask(
     course_name: Optional[str] = None,
     model: Optional[str] = None,
     limit: int = 4,
+    class_filter: Optional[str] = None,
+    subject_filter: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Ported ask() function.
@@ -157,7 +177,13 @@ def ask(
     start_time = time.time()
 
     # 1. Retrieve context from Qdrant
-    docs = similarity_search(collection_name=collection, query=query, limit=limit)
+    docs = similarity_search(
+        collection_name=collection, 
+        query=query, 
+        limit=limit,
+        class_filter=class_filter,
+        subject_filter=subject_filter
+    )
     context = "\n\n".join(d["chunk_text"] for d in docs if d.get("chunk_text"))[:3000]
 
     # 2. Build Prompts
@@ -204,6 +230,8 @@ def query_rag(request: RagQueryRequest) -> RagQueryResponse:
         collection_name=request.collection_name,
         course_name=course,
         model=request.model,
+        class_filter=request.class_filter,
+        subject_filter=request.subject_filter,
     )
     return RagQueryResponse(
         answer=result["answer"],

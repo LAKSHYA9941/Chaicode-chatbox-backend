@@ -7,6 +7,8 @@ class RagQueryRequest(BaseModel):
     course_id: Optional[str] = ""
     course_name: Optional[str] = ""
     model: Optional[str] = None
+    class_filter: Optional[str] = None
+    subject_filter: Optional[str] = None
 
 class Source(BaseModel):
     chunk_text: str

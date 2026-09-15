@@ -57,43 +57,37 @@ async def hmac_security_middleware(request: Request, call_next):
         raw_body = await request.body()
         secret = get_hmac_secret().encode("utf-8")
 
-        # Optional timestamp replay-attack validation
+        # Timestamp replay-attack validation
         timestamp = request.headers.get("X-Timestamp")
-        if timestamp:
-            try:
-                ts_val = float(timestamp)
-                if ts_val > 1e11:  # Convert milliseconds to seconds if needed
-                    ts_val = ts_val / 1000.0
-                if abs(time.time() - ts_val) > MAX_TIMESTAMP_SKEW_SECONDS:
-                    return JSONResponse(
-                        status_code=status.HTTP_401_UNAUTHORIZED,
-                        content={"detail": "Unauthorized: Request timestamp expired or skewed"},
-                    )
-                # Compute signature with timestamp: hmac(timestamp.body)
-                ts_message = timestamp.encode("utf-8") + b"." + raw_body
-                expected_with_ts = hmac.new(secret, ts_message, hashlib.sha256).hexdigest()
-                expected_raw = hmac.new(secret, raw_body, hashlib.sha256).hexdigest()
+        if not timestamp:
+            return JSONResponse(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                content={"detail": "Unauthorized: Missing X-Timestamp header"},
+            )
 
-                if not (
-                    hmac.compare_digest(signature.lower(), expected_with_ts.lower())
-                    or hmac.compare_digest(signature.lower(), expected_raw.lower())
-                ):
-                    return JSONResponse(
-                        status_code=status.HTTP_401_UNAUTHORIZED,
-                        content={"detail": "Unauthorized: Invalid HMAC signature"},
-                    )
-            except ValueError:
+        try:
+            ts_val = float(timestamp)
+            if ts_val > 1e11:  # Convert milliseconds to seconds if needed
+                ts_val = ts_val / 1000.0
+            if abs(time.time() - ts_val) > MAX_TIMESTAMP_SKEW_SECONDS:
                 return JSONResponse(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    content={"detail": "Unauthorized: Invalid timestamp header format"},
+                    content={"detail": "Unauthorized: Request timestamp expired or skewed"},
                 )
-        else:
-            expected_signature = hmac.new(secret, raw_body, hashlib.sha256).hexdigest()
+            # Compute signature with timestamp: hmac(timestamp.body)
+            ts_message = timestamp.encode("utf-8") + b"." + raw_body
+            expected_signature = hmac.new(secret, ts_message, hashlib.sha256).hexdigest()
+
             if not hmac.compare_digest(signature.lower(), expected_signature.lower()):
                 return JSONResponse(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     content={"detail": "Unauthorized: Invalid HMAC signature"},
                 )
+        except ValueError:
+            return JSONResponse(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                content={"detail": "Unauthorized: Invalid timestamp header format"},
+            )
 
     response = await call_next(request)
     return response

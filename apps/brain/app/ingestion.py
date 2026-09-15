@@ -242,6 +242,9 @@ def ingest_md_files(
     chunk_size: int = CHUNK_SIZE,
     chunk_overlap: int = CHUNK_OVERLAP,
     headers_to_split_on: Optional[List[tuple]] = None,
+    chapter: Optional[str] = None,
+    class_name: Optional[str] = None,
+    subject: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Synchronous ingestion function for Markdown (.md) files using Nomic Embeddings and Qdrant.
@@ -277,6 +280,10 @@ def ingest_md_files(
         or course.get("course_id")
         or ""
     )
+
+    target_chapter = chapter or course.get("chapter")
+    target_class = class_name or course.get("class")
+    target_subject = subject or course.get("subject")
 
     # Normalize file inputs: support directory path, single file, or list
     file_items: List[Any] = []
@@ -334,13 +341,21 @@ def ingest_md_files(
 
         processed_files += 1
 
+        base_meta = {"courseId": target_course_id, "file": file_name}
+        if target_chapter:
+            base_meta["chapter"] = target_chapter
+        if target_class:
+            base_meta["class"] = target_class
+        if target_subject:
+            base_meta["subject"] = target_subject
+
         # Two-stage Markdown Chunking
         docs = chunk_markdown(
             raw_text,
             headers_to_split_on=headers_to_split_on,
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
-            base_metadata={"courseId": target_course_id, "file": file_name},
+            base_metadata=base_meta,
         )
 
         chunk_texts = [d.page_content.strip() for d in docs if d.page_content.strip()]
@@ -444,6 +459,9 @@ async def async_ingest_md_files(
     chunk_size: int = CHUNK_SIZE,
     chunk_overlap: int = CHUNK_OVERLAP,
     headers_to_split_on: Optional[List[tuple]] = None,
+    chapter: Optional[str] = None,
+    class_name: Optional[str] = None,
+    subject: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Async wrapper for ingest_md_files."""
     return await asyncio.to_thread(
@@ -457,6 +475,9 @@ async def async_ingest_md_files(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
         headers_to_split_on=headers_to_split_on,
+        chapter=chapter,
+        class_name=class_name,
+        subject=subject,
     )
 
 
@@ -515,6 +536,9 @@ if __name__ == "__main__":
         default=CHUNK_OVERLAP,
         help="Overlap characters for recursive chunking",
     )
+    parser.add_argument("--chapter", type=str, default=None, help="Chapter metadata")
+    parser.add_argument("--class-name", type=str, default=None, help="Class metadata (e.g. 7)")
+    parser.add_argument("--subject", type=str, default=None, help="Subject metadata")
 
     args = parser.parse_args()
     target_files = args.file if args.file else args.dir
@@ -527,5 +551,8 @@ if __name__ == "__main__":
         force_recreate=args.recreate,
         chunk_size=args.chunk_size,
         chunk_overlap=args.chunk_overlap,
+        chapter=args.chapter,
+        class_name=args.class_name,
+        subject=args.subject,
     )
     print(f"[ingest] Ingestion complete: {res}", flush=True)

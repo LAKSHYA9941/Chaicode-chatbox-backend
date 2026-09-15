@@ -45,13 +45,16 @@ export const askQuestion = async (req, res, next) => {
           course_name: course.name,
         });
 
-        const signature = crypto.createHmac("sha256", secret).update(payload).digest("hex");
+        const timestamp = Date.now().toString();
+        const messageToSign = timestamp + "." + payload;
+        const signature = crypto.createHmac("sha256", secret).update(messageToSign).digest("hex");
 
         const brainRes = await fetch(`${brainUrl}/rag/query`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "X-Signature": signature,
+            "X-Timestamp": timestamp,
           },
           body: payload,
         });
