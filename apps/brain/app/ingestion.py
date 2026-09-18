@@ -282,7 +282,7 @@ def ingest_md_files(
     )
 
     target_chapter = chapter or course.get("chapter")
-    target_class = class_name or course.get("class")
+    target_class = class_name or course.get("class_name") or course.get("class")
     target_subject = subject or course.get("subject")
 
     # Normalize file inputs: support directory path, single file, or list
@@ -343,11 +343,12 @@ def ingest_md_files(
 
         base_meta = {"courseId": target_course_id, "file": file_name}
         if target_chapter:
-            base_meta["chapter"] = target_chapter
+            base_meta["chapter"] = str(target_chapter)
         if target_class:
-            base_meta["class"] = target_class
+            base_meta["class"] = str(target_class)
+            base_meta["class_name"] = str(target_class)
         if target_subject:
-            base_meta["subject"] = target_subject
+            base_meta["subject"] = str(target_subject)
 
         # Two-stage Markdown Chunking
         docs = chunk_markdown(
@@ -537,7 +538,7 @@ if __name__ == "__main__":
         help="Overlap characters for recursive chunking",
     )
     parser.add_argument("--chapter", type=str, default=None, help="Chapter metadata")
-    parser.add_argument("--class-name", type=str, default=None, help="Class metadata (e.g. 7)")
+    parser.add_argument("--class-name", "--class", dest="class_name", type=str, default=None, help="Class metadata (e.g. 7)")
     parser.add_argument("--subject", type=str, default=None, help="Subject metadata")
 
     args = parser.parse_args()

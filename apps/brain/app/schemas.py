@@ -26,6 +26,9 @@ class IngestRequest(BaseModel):
     file_paths: Optional[List[str]] = Field(default_factory=list)
     files: Optional[List[Any]] = Field(default_factory=list)
     force_recreate: bool = False
+    chapter: Optional[str] = None
+    class_name: Optional[str] = None
+    subject: Optional[str] = None
 
 
 class IngestResponse(BaseModel):

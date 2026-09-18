@@ -107,9 +107,17 @@ def similarity_search(
     query_filter = None
     must_conditions = []
     if class_filter:
-        must_conditions.append(models.FieldCondition(key="class", match=models.MatchValue(value=class_filter)))
+        class_val = str(class_filter)
+        must_conditions.append(
+            models.Filter(
+                should=[
+                    models.FieldCondition(key="class_name", match=models.MatchValue(value=class_val)),
+                    models.FieldCondition(key="class", match=models.MatchValue(value=class_val)),
+                ]
+            )
+        )
     if subject_filter:
-        must_conditions.append(models.FieldCondition(key="subject", match=models.MatchValue(value=subject_filter)))
+        must_conditions.append(models.FieldCondition(key="subject", match=models.MatchValue(value=str(subject_filter))))
     
     if must_conditions:
         query_filter = models.Filter(must=must_conditions)
@@ -176,13 +184,16 @@ def ask(
 
     start_time = time.time()
 
+    target_class_filter = class_filter or opts.get("class_filter") or opts.get("class_name") or opts.get("className") or opts.get("class")
+    target_subject_filter = subject_filter or opts.get("subject_filter") or opts.get("subject")
+
     # 1. Retrieve context from Qdrant
     docs = similarity_search(
         collection_name=collection, 
         query=query, 
         limit=limit,
-        class_filter=class_filter,
-        subject_filter=subject_filter
+        class_filter=target_class_filter,
+        subject_filter=target_subject_filter,
     )
     context = "\n\n".join(d["chunk_text"] for d in docs if d.get("chunk_text"))[:3000]
 
@@ -195,7 +206,7 @@ def ask(
     completion = groq.chat.completions.create(
         model=chosen_model,
         temperature=0.2,
-        max_tokens=500,
+        max_tokens=1000,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},

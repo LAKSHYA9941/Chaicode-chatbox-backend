@@ -56,6 +56,16 @@ subtitle_files/*
 *.tmp
 *.temp
 
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+apps/brain/venv/
+
+
 # Media files (if these are strictly user uploads, otherwise remove these lines)
 # *.jpg
 # *.jpeg

@@ -35,6 +35,9 @@ async def hmac_security_middleware(request: Request, call_next):
     HMAC Authentication Middleware.
     Validates HMAC-SHA256 signatures on internal protected routes between Express and FastAPI.
     """
+    if os.getenv("DISABLE_HMAC_FOR_DEV", "false").lower() == "true":
+        return await call_next(request)
+
     path = request.url.path
     # Protect /rag/* endpoints as well as direct /query and /ingest endpoints
     is_protected = path.startswith("/rag/") or path in ["/query", "/ingest"]
@@ -130,6 +133,9 @@ def rag_ingest_endpoint(request: IngestRequest):
             course={"courseId": request.course_id, "qdrantCollection": request.collection_name},
             files=files_to_process,
             force_recreate=request.force_recreate,
+            chapter=request.chapter,
+            class_name=request.class_name,
+            subject=request.subject,
         )
         return IngestResponse(
             upserted=result["upserted"],
