@@ -17,7 +17,7 @@ class Source(BaseModel):
 class RagQueryResponse(BaseModel):
     answer: str
     sources: List[Source] = Field(default_factory=list)
-    confidence: float = 1.0
+    confidence: float = 0.0
     meta: Dict[str, Any] = Field(default_factory=dict)
 
 class IngestRequest(BaseModel):

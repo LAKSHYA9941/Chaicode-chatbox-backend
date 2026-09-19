@@ -117,7 +117,16 @@ def similarity_search(
             )
         )
     if subject_filter:
-        must_conditions.append(models.FieldCondition(key="subject", match=models.MatchValue(value=str(subject_filter))))
+        subj_val = str(subject_filter)
+        subj_variants = list(dict.fromkeys([subj_val, subj_val.lower(), subj_val.capitalize(), subj_val.upper()]))
+        must_conditions.append(
+            models.Filter(
+                should=[
+                    models.FieldCondition(key="subject", match=models.MatchValue(value=variant))
+                    for variant in subj_variants
+                ]
+            )
+        )
     
     if must_conditions:
         query_filter = models.Filter(must=must_conditions)
@@ -133,12 +142,37 @@ def similarity_search(
         points = results.points
     except Exception as error:
         err_msg = str(error)
-        if "Vector dimension error" in err_msg or "dimension mismatch" in err_msg.lower():
+        if "Index required but not found for" in err_msg:
+            # Self-healing: automatically create missing payload keyword index and retry
+            import re
+            match = re.search(r'Index required but not found for ["\\]*(\w+)["\\]*', err_msg)
+            if match:
+                missing_field = match.group(1)
+                try:
+                    client.create_payload_index(
+                        collection_name=collection_name,
+                        field_name=missing_field,
+                        field_schema=models.PayloadSchemaType.KEYWORD,
+                    )
+                    results = client.query_points(
+                        collection_name=collection_name,
+                        query=query_vector,
+                        query_filter=query_filter,
+                        limit=limit,
+                        with_payload=True,
+                    )
+                    points = results.points
+                except Exception:
+                    raise error
+            else:
+                raise error
+        elif "Vector dimension error" in err_msg or "dimension mismatch" in err_msg.lower():
             mismatch_err = RuntimeError("QDRANT_DIMENSION_MISMATCH: Vector dimension error")
             setattr(mismatch_err, "code", "QDRANT_DIMENSION_MISMATCH")
             setattr(mismatch_err, "details", {"message": err_msg})
             raise mismatch_err from error
-        raise error
+        else:
+            raise error
 
     docs = []
     for point in points:
@@ -217,7 +251,7 @@ def ask(
     latency_ms = int((time.time() - start_time) * 1000)
 
     sources = [Source(chunk_text=d["chunk_text"], score=d["score"]) for d in docs if d.get("chunk_text")]
-    confidence = (sum(d["score"] for d in docs) / len(docs)) if docs else 1.0
+    confidence = (sum(d["score"] for d in docs) / len(docs)) if docs else 0.0
 
     return {
         "answer": answer,

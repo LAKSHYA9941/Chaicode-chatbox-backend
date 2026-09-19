@@ -104,6 +104,17 @@ def ensure_collection(
             ),
         )
 
+    # Ensure payload keyword indexes exist for metadata filtering
+    for field in ["class", "class_name", "subject", "chapter", "courseId"]:
+        try:
+            client.create_payload_index(
+                collection_name=collection_name,
+                field_name=field,
+                field_schema=models.PayloadSchemaType.KEYWORD,
+            )
+        except Exception:
+            pass
+
 
 def parse_md_content(content: str) -> str:
     """
