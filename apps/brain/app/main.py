@@ -11,6 +11,8 @@ from fastapi.responses import JSONResponse
 from app.schemas import IngestRequest, IngestResponse, RagQueryRequest, RagQueryResponse
 from app.rag import query_rag
 from app.ingestion import ingest_md_files, ingest_vtt_files
+from app.test_schemas import ChapterTestResponse, GenerateTestRequest
+from app.test_generator import generate_chapter_test_from_request
 
 # Load environment variables
 load_dotenv(find_dotenv(usecwd=True))
@@ -147,6 +149,18 @@ def rag_ingest_endpoint(request: IngestRequest):
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
+
+@rag_router.post("/generate-test", response_model=ChapterTestResponse)
+def generate_test_endpoint(request: GenerateTestRequest):
+    """Generate a structured, curriculum-aligned chapter test."""
+    try:
+        return generate_chapter_test_from_request(request)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 # Include the /rag router
